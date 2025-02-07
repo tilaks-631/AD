@@ -430,22 +430,23 @@
           const weekKey = getWeekKey();
           if(!worker.attendance) worker.attendance = {};
           if(!worker.attendance[weekKey]) worker.attendance[weekKey] = ['', '', '', '', '', ''];
-          let state = worker.attendance[weekKey][i];
-          setCellStyle(td, state);
-          // On tap, cycle through attendance states (Blank → P → A → H → Blank)
-          td.addEventListener('click', () => {
+          // Instead of capturing stale "state", fetch current state on tap:
+          td.addEventListener('click', function() {
             pushHistory();
+            const currentState = worker.attendance[weekKey][i];
             let newState;
-            if(!state || state === '') newState = 'P';
-            else if(state === 'P') newState = 'A';
-            else if(state === 'A') newState = 'H';
-            else if(state === 'H') newState = '';
+            if(!currentState || currentState === '') newState = 'P';
+            else if(currentState === 'P') newState = 'A';
+            else if(currentState === 'A') newState = 'H';
+            else if(currentState === 'H') newState = '';
             worker.attendance[weekKey][i] = newState;
-            state = newState;
             setCellStyle(td, newState);
             renderTable();
             saveData();
           });
+          // Set initial style based on state
+          let state = worker.attendance[weekKey][i];
+          setCellStyle(td, state);
           tr.appendChild(td);
           // Payment calculation: P = full wage, H = half wage, A = 0
           let wage = parseFloat(worker.wage) || 0;
