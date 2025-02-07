@@ -354,7 +354,7 @@
         renderCategoryList();
       }
     });
-    // Update clock
+    // Update clock (Real Time Clock at top)
     function updateClock() {
       const now = new Date();
       document.getElementById('clock').innerText = now.toLocaleString();
@@ -378,7 +378,7 @@
       const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       return new Date(d.setDate(diff));
     }
-    // Update week headers for Mon-Sat
+    // Update week headers for Mon-Sat and store each header's date in a data attribute
     function updateWeekHeaders() {
       let today = new Date();
       today.setDate(today.getDate() + currentWeekOffset * 7);
@@ -391,21 +391,45 @@
         document.getElementById('friHeader'),
         document.getElementById('satHeader')
       ];
+      const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       headers.forEach((header, index) => {
         let date = new Date(monday);
         date.setDate(date.getDate() + index);
-        header.innerText = header.innerText.split(' ')[0] + ' ' + (date.getMonth() + 1) + '/' + date.getDate();
+        header.innerText = dayNames[index] + ' ' + (date.getMonth()+1) + '/' + date.getDate();
+        header.dataset.date = date.getFullYear() + '-' + (date.getMonth()+1) + '-' + date.getDate();
       });
-      document.getElementById('weekDisplay').innerText = "Week of " + (monday.getMonth() + 1) + '/' + monday.getDate();
     }
+    // Function to update the header for the current day with real time (date + time)
+    function updateCurrentDayHeader() {
+      const headers = [
+        document.getElementById('monHeader'),
+        document.getElementById('tueHeader'),
+        document.getElementById('wedHeader'),
+        document.getElementById('thuHeader'),
+        document.getElementById('friHeader'),
+        document.getElementById('satHeader')
+      ];
+      const now = new Date();
+      const todayStr = now.getFullYear() + '-' + (now.getMonth()+1) + '-' + now.getDate();
+      const timeStr = now.toLocaleTimeString();
+      headers.forEach(header => {
+        if(header.dataset.date === todayStr) {
+          // Update header text to include current time
+          // Example: "Wed 3/15 10:05:30 AM"
+          const dayName = header.innerText.split(' ')[0];
+          const datePart = header.dataset.date.split('-')[1] + '/' + header.dataset.date.split('-')[2];
+          header.innerText = dayName + ' ' + datePart + ' ' + timeStr;
+        }
+      });
+    }
+    // Call updateCurrentDayHeader every second
+    setInterval(updateCurrentDayHeader, 1000);
     // getWeekKey() returns a unique key for each week based on Monday's date.
-    // This ensures that if the current date moves into a new week, a new key is generated,
-    // and the previous week's data remains saved.
     function getWeekKey() {
       let today = new Date();
       today.setDate(today.getDate() + currentWeekOffset * 7);
       const monday = getMonday(today);
-      return monday.getFullYear() + '-' + (monday.getMonth() + 1) + '-' + monday.getDate();
+      return monday.getFullYear() + '-' + (monday.getMonth()+1) + '-' + monday.getDate();
     }
     // Render attendance table and calculate payment
     function renderTable() {
@@ -440,10 +464,9 @@
           const weekKey = getWeekKey();
           if(!worker.attendance) worker.attendance = {};
           if(!worker.attendance[weekKey]) worker.attendance[weekKey] = ['', '', '', '', '', ''];
-          // Set initial style based on current state
           let state = worker.attendance[weekKey][i];
           setCellStyle(td, state);
-          // Define handler to cycle attendance state (supports click and touchstart)
+          // Handler to cycle attendance state (supports click and touchstart)
           const attendanceHandler = function(e) {
             e.preventDefault();
             pushHistory();
