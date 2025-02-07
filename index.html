@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Workers Attendance Web App</title>
+  <!-- jsPDF CDN for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    /* Global Styles & Gradient Background */
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      padding: 20px;
+      background: #f7f7f7;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+      border-radius: 10px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    header h1 {
+      font-size: 2em;
+      margin: 0;
+      padding: 10px;
+      text-shadow: 1px 1px 3px #aaa;
+    }
+    .clock {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-weight: bold;
+      font-size: 0.9em;
+    }
+    .week-navigation {
+      margin-top: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    .week-navigation button {
+      padding: 8px 16px;
+      border: none;
+      background: #3498db;
+      color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .week-navigation button:hover {
+      transform: translateY(-2px);
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+    .controls button, .controls select {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #2ecc71;
+      color: #fff;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      transition: transform 0.2s;
+    }
+    .controls button:hover, .controls select:hover {
+      transform: translateY(-2px);
+    }
+    .table-container {
+      overflow-x: auto;
+      margin-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 10px;
+    }
+    table thead {
+      background: #34495e;
+      color: #fff;
+    }
+    table th, table td {
+      padding: 10px;
+      border: 1px solid #ccc;
+      text-align: center;
+      min-width: 80px;
+    }
+    table tbody tr:nth-child(even) {
+      background: #ecf0f1;
+    }
+    .attendance-cell {
+      cursor: pointer;
+      font-weight: bold;
+      transition: background 0.2s;
+    }
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background: rgba(0,0,0,0.5);
+      padding-top: 60px;
+    }
+    .modal-content {
+      background: #fff;
+      margin: 5% auto;
+      padding: 20px;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .modal-content h2 {
+      margin-top: 0;
+      text-align: center;
+    }
+    .modal-content form div {
+      margin-bottom: 15px;
+    }
+    .modal-content label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: bold;
+    }
+    .modal-content input, .modal-content select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .modal-content button {
+      width: 100%;
+      padding: 10px;
+      background: #3498db;
+      border: none;
+      color: #fff;
+      font-size: 1em;
+      border-radius: 5px;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .close {
+      position: absolute;
+      right: 15px;
+      top: 10px;
+      font-size: 1.5em;
+      cursor: pointer;
+      color: #aaa;
+    }
+    /* Category List Styles */
+    #categoryList {
+      margin: 10px auto;
+      max-width: 600px;
+      background: #fff;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    #categoryList h3 {
+      text-align: center;
+      margin-top: 0;
+    }
+    .cat-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 10px;
+      border-bottom: 1px solid #ccc;
+    }
+    .cat-item:last-child {
+      border-bottom: none;
+    }
+    .cat-item button {
+      margin-left: 5px;
+      padding: 5px 8px;
+      background: #e74c3c;
+      border: none;
+      border-radius: 3px;
+      color: #fff;
+      cursor: pointer;
+    }
+    .cat-item button.edit-btn {
+      background: #f1c40f;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Workers Attendance</h1>
+      <div class="clock" id="clock"></div>
+      <div class="week-navigation">
+        <button id="prevWeek">Previous Week</button>
+        <span id="weekDisplay"></span>
+        <button id="nextWeek">Next Week</button>
+      </div>
+    </header>
+
+    <div class="controls">
+      <button id="addWorkerBtn">Add Worker</button>
+      <button id="addCategoryBtn">Add Category</button>
+      <select id="filterCategory">
+        <option value="all">All Categories</option>
+      </select>
+      <button id="exportPdfBtn">Export as PDF</button>
+      <button id="undoBtn">Undo</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+
+    <!-- Category List Section -->
+    <div id="categoryList">
+      <h3>Category List</h3>
+      <div id="catItems"></div>
+    </div>
+
+    <div class="table-container">
+      <table id="attendanceTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Worker Name</th>
+            <th>Category</th>
+            <th id="mondayHeader">Mon</th>
+            <th id="tuesdayHeader">Tue</th>
+            <th id="wednesdayHeader">Wed</th>
+            <th id="thursdayHeader">Thu</th>
+            <th id="fridayHeader">Fri</th>
+            <th id="saturdayHeader">Sat</th>
+            <th>Total Payment</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dynamically generated rows -->
+        </tbody>
+      </table>
+      <div id="overallTotal" style="text-align:right; font-weight:bold; margin-top:10px;"></div>
+    </div>
+  </div>
+
+  <!-- Modal for Adding/Editing Worker -->
+  <div id="workerModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeWorkerModal">&times;</span>
+      <h2 id="workerModalTitle">Add Worker</h2>
+      <form id="workerForm">
+        <input type="hidden" id="workerId" value="">
+        <div>
+          <label for="workerName">Name:</label>
+          <input type="text" id="workerName" required>
+        </div>
+        <div>
+          <label for="workerCategory">Category:</label>
+          <select id="workerCategory" required>
+            <!-- Options populated dynamically -->
+          </select>
+        </div>
+        <div>
+          <label for="workerWage">Wage:</label>
+          <input type="number" id="workerWage" readonly>
+        </div>
+        <button type="submit">Save Worker</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal for Adding/Editing Category -->
+  <div id="categoryModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeCategoryModal">&times;</span>
+      <h2 id="categoryModalTitle">Add Category</h2>
+      <form id="categoryForm">
+        <input type="hidden" id="categoryId" value="">
+        <div>
+          <label for="categoryName">Category Name:</label>
+          <input type="text" id="categoryName" required>
+        </div>
+        <div>
+          <label for="categoryWage">Wage:</label>
+          <input type="number" id="categoryWage" required>
+        </div>
+        <button type="submit">Save Category</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    /***********************
+     * Data & Initialization
+     ***********************/
+    let workers = [];
+    let categories = [];
+    let historyStack = [];
+    let currentWeekOffset = 0;
+
+    // Load data from localStorage if available
+    function loadData() {
+      const workersData = localStorage.getItem('workers');
+      const categoriesData = localStorage.getItem('categories');
+      if(workersData) workers = JSON.parse(workersData);
+      if(categoriesData) categories = JSON.parse(categoriesData);
+    }
+
+    // Save data to localStorage
+    function saveData() {
+      localStorage.setItem('workers', JSON.stringify(workers));
+      localStorage.setItem('categories', JSON.stringify(categories));
+    }
+
+    // Save state for undo
+    function pushHistory() {
+      historyStack.push({
+        workers: JSON.parse(JSON.stringify(workers)),
+        categories: JSON.parse(JSON.stringify(categories))
+      });
+      if(historyStack.length > 50) historyStack.shift();
+    }
+
+    // Undo last action
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      if(historyStack.length > 0) {
+        let lastState = historyStack.pop();
+        workers = lastState.workers;
+        categories = lastState.categories;
+        saveData();
+        renderTable();
+        populateCategoryOptions();
+        renderCategoryList();
+      } else {
+        alert('Nothing to undo.');
+      }
+    });
+
+    // Reset all data
+    document.getElementById('resetBtn').addEventListener('click', () => {
+      if(confirm('Are you sure you want to reset all data?')) {
+        localStorage.clear();
+        workers = [];
+        categories = [];
+        historyStack = [];
+        renderTable();
+        populateCategoryOptions();
+        renderCategoryList();
+      }
+    });
+
+    /***********************
+     * Clock & Week Navigation
+     ***********************/
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').innerText = now.toLocaleString();
+    }
+    setInterval(updateClock, 1000);
+
+    // Week navigation buttons
+    document.getElementById('prevWeek').addEventListener('click', () => {
+      currentWeekOffset--;
+      updateWeekHeaders();
+      renderTable();
+    });
+    document.getElementById('nextWeek').addEventListener('click', () => {
+      currentWeekOffset++;
+      updateWeekHeaders();
+      renderTable();
+    });
+
+    // Get Monday of current week based on a given date
+    function getMonday(d) {
+      d = new Date(d);
+      var day = d.getDay();
+      var diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(d.setDate(diff));
+    }
+    // Update header dates for Mon-Sat
+    function updateWeekHeaders() {
+      let today = new Date();
+      today.setDate(today.getDate() + currentWeekOffset * 7);
+      let monday = getMonday(today);
+      const headers = [
+        document.getElementById('mondayHeader'),
+        document.getElementById('tuesdayHeader'),
+        document.getElementById('wednesdayHeader'),
+        document.getElementById('thursdayHeader'),
+        document.getElementById('fridayHeader'),
+        document.getElementById('saturdayHeader')
+      ];
+      headers.forEach((header, index) => {
+        let date = new Date(monday);
+        date.setDate(date.getDate() + index);
+        header.innerText = header.innerText.split(' ')[0] + ' ' + (date.getMonth()+1) + '/' + date.getDate();
+      });
+      document.getElementById('weekDisplay').innerText = "Week of " + (monday.getMonth()+1) + '/' + monday.getDate();
+    }
+
+    /***********************
+     * Table Rendering & Attendance Logic
+     ***********************/
+    // Render the attendance table rows
+    function renderTable() {
+      const tbody = document.querySelector('#attendanceTable tbody');
+      tbody.innerHTML = '';
+      let filter = document.getElementById('filterCategory').value;
+      let count = 1;
+      workers.forEach(worker => {
+        if(filter !== 'all' && worker.categoryId !== filter) return;
+        let tr = document.createElement('tr');
+
+        // Serial number
+        let tdSerial = document.createElement('td');
+        tdSerial.innerText = count++;
+        // Long press on serial cell to delete worker
+        addLongPressDelete(tdSerial, worker);
+        tr.appendChild(tdSerial);
+
+        // Worker Name (double-click to edit)
+        let tdName = document.createElement('td');
+        tdName.innerText = worker.name;
+        tdName.addEventListener('dblclick', () => { openWorkerModal(worker); });
+        tr.appendChild(tdName);
+
+        // Category (double-click to edit worker)
+        let cat = categories.find(c => c.id === worker.categoryId);
+        let tdCategory = document.createElement('td');
+        tdCategory.innerText = cat ? cat.name : '';
+        tdCategory.addEventListener('dblclick', () => { openWorkerModal(worker); });
+        tr.appendChild(tdCategory);
+
+        // Attendance cells for Mon-Sat
+        let totalPayment = 0;
+        for(let i = 0; i < 6; i++){
+          let td = document.createElement('td');
+          td.classList.add('attendance-cell');
+
+          let weekKey = getWeekKey();
+          // Ensure attendance structure exists
+          if(!worker.attendance) worker.attendance = {};
+          if(!worker.attendance[weekKey]) worker.attendance[weekKey] = ['', '', '', '', '', ''];
+          let state = worker.attendance[weekKey][i];
+          setCellState(td, state);
+
+          td.addEventListener('click', () => {
+            pushHistory();
+            // Cycle: blank -> P -> A -> H -> blank
+            let newState;
+            if(!state || state === '') newState = 'P';
+            else if(state === 'P') newState = 'A';
+            else if(state === 'A') newState = 'H';
+            else if(state === 'H') newState = '';
+            worker.attendance[weekKey][i] = newState;
+            state = newState;
+            setCellState(td, newState);
+            renderTable(); // Recalculate payments
+            saveData();
+          });
+          // Optional: add long press delete on attendance cell too
+          addLongPressDelete(td, worker);
+          tr.appendChild(td);
+
+          // Payment calculation for this cell
+          if(state === 'P') totalPayment += worker.wage;
+          else if(state === 'H') totalPayment += worker.wage / 2;
+        }
+        // Total Payment cell
+        let tdTotal = document.createElement('td');
+        tdTotal.innerText = totalPayment.toFixed(2);
+        tr.appendChild(tdTotal);
+
+        tbody.appendChild(tr);
+      });
+      updateOverallTotal();
+    }
+
+    // Set attendance cell appearance based on state
+    function setCellState(cell, state) {
+      cell.innerText = state;
+      cell.style.backgroundColor = state === 'P' ? 'lightgreen' :
+                                     state === 'A' ? 'tomato' :
+                                     state === 'H' ? 'khaki' : 'white';
+    }
+
+    // Compute a unique key for the current week (e.g., "2025-2-10")
+    function getWeekKey() {
+      let today = new Date();
+      today.setDate(today.getDate() + currentWeekOffset * 7);
+      let monday = getMonday(today);
+      return monday.getFullYear() + '-' + (monday.getMonth()+1) + '-' + monday.getDate();
+    }
+
+    // Update overall total payment display
+    function updateOverallTotal() {
+      let overall = 0;
+      workers.forEach(worker => {
+        let weekKey = getWeekKey();
+        if(worker.attendance && worker.attendance[weekKey]){
+          worker.attendance[weekKey].forEach(state => {
+            if(state === 'P') overall += worker.wage;
+            else if(state === 'H') overall += worker.wage/2;
+          });
+        }
+      });
+      document.getElementById('overallTotal').innerText = "Overall Total Payment: " + overall.toFixed(2);
+    }
+
+    // Add long press delete functionality on an element for a given worker
+    function addLongPressDelete(element, worker) {
+      let pressTimer;
+      element.addEventListener('mousedown', () => {
+        pressTimer = window.setTimeout(() => {
+          if(confirm('Delete worker ' + worker.name + '?')) {
+            pushHistory();
+            workers = workers.filter(w => w.id !== worker.id);
+            saveData();
+            renderTable();
+          }
+        }, 1500);
+      });
+      element.addEventListener('mouseup', () => {
+        clearTimeout(pressTimer);
+      });
+    }
+
+    /***********************
+     * Category Dropdown & List
+     ***********************/
+    // Populate category options in worker form and filter dropdown
+    function populateCategoryOptions() {
+      let filterSelect = document.getElementById('filterCategory');
+      filterSelect.innerHTML = '<option value="all">All Categories</option>';
+      let workerCatSelect = document.getElementById('workerCategory');
+      workerCatSelect.innerHTML = '';
+      categories.forEach(cat => {
+        let option1 = document.createElement('option');
+        option1.value = cat.id;
+        option1.innerText = cat.name;
+        filterSelect.appendChild(option1);
+
+        let option2 = document.createElement('option');
+        option2.value = cat.id;
+        option2.innerText = cat.name;
+        workerCatSelect.appendChild(option2);
+      });
+    }
+    document.getElementById('filterCategory').addEventListener('change', renderTable);
+
+    // Render category list with edit & delete options
+    function renderCategoryList() {
+      const catDiv = document.getElementById('catItems');
+      catDiv.innerHTML = '';
+      categories.forEach(cat => {
+        const div = document.createElement('div');
+        div.classList.add('cat-item');
+        div.innerHTML = `<span>${cat.name} (Wage: ${cat.wage})</span>`;
+        // Edit button
+        const editBtn = document.createElement('button');
+        editBtn.classList.add('edit-btn');
+        editBtn.innerText = 'Edit';
+        editBtn.addEventListener('click', () => {
+          openCategoryModal(cat);
+        });
+        div.appendChild(editBtn);
+        // Delete button
+        const delBtn = document.createElement('button');
+        delBtn.innerText = 'Delete';
+        delBtn.addEventListener('click', () => {
+          if(confirm('Delete category ' + cat.name + '?')) {
+            pushHistory();
+            categories = categories.filter(c => c.id !== cat.id);
+            // Optionally, remove category assignment from workers
+            workers.forEach(worker => {
+              if(worker.categoryId === cat.id) worker.categoryId = '';
+            });
+            saveData();
+            populateCategoryOptions();
+            renderCategoryList();
+            renderTable();
+          }
+        });
+        div.appendChild(delBtn);
+        catDiv.appendChild(div);
+      });
+    }
+
+    /***********************
+     * Modal Handling for Worker & Category
+     ***********************/
+    // Worker Modal
+    const workerModal = document.getElementById('workerModal');
+    document.getElementById('addWorkerBtn').addEventListener('click', () => {
+      openWorkerModal();
+    });
+    document.getElementById('closeWorkerModal').addEventListener('click', () => {
+      workerModal.style.display = 'none';
+    });
+    function openWorkerModal(worker = null) {
+      workerModal.style.display = 'block';
+      document.getElementById('workerForm').reset();
+      if(worker) {
+        document.getElementById('workerModalTitle').innerText = 'Edit Worker';
+        document.getElementById('workerId').value = worker.id;
+        document.getElementById('workerName').value = worker.name;
+        document.getElementById('workerCategory').value = worker.categoryId;
+        document.getElementById('workerWage').value = worker.wage;
+      } else {
+        document.getElementById('workerModalTitle').innerText = 'Add Worker';
+      }
+    }
+    // When category is changed in worker form, auto-update wage field
+    document.getElementById('workerCategory').addEventListener('change', function() {
+      let catId = this.value;
+      let cat = categories.find(c => c.id === catId);
+      if(cat) {
+        document.getElementById('workerWage').value = cat.wage;
+      } else {
+        document.getElementById('workerWage').value = '';
+      }
+    });
+    // Worker form submission
+    document.getElementById('workerForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      pushHistory();
+      let id = document.getElementById('workerId').value;
+      let name = document.getElementById('workerName').value;
+      let categoryId = document.getElementById('workerCategory').value;
+      let wage = parseFloat(document.getElementById('workerWage').value);
+      if(id) {
+        // Edit existing worker
+        let worker = workers.find(w => w.id === id);
+        if(worker) {
+          worker.name = name;
+          worker.categoryId = categoryId;
+          worker.wage = wage;
+        }
+      } else {
+        // Add new worker
+        let newWorker = {
+          id: 'w' + new Date().getTime(),
+          name: name,
+          categoryId: categoryId,
+          wage: wage,
+          attendance: {}
+        };
+        workers.push(newWorker);
+      }
+      saveData();
+      workerModal.style.display = 'none';
+      renderTable();
+    });
+
+    // Category Modal
+    const categoryModal = document.getElementById('categoryModal');
+    document.getElementById('addCategoryBtn').addEventListener('click', () => {
+      openCategoryModal();
+    });
+    document.getElementById('closeCategoryModal').addEventListener('click', () => {
+      categoryModal.style.display = 'none';
+    });
+    function openCategoryModal(category = null) {
+      categoryModal.style.display = 'block';
+      document.getElementById('categoryForm').reset();
+      if(category) {
+        document.getElementById('categoryModalTitle').innerText = 'Edit Category';
+        document.getElementById('categoryId').value = category.id;
+        document.getElementById('categoryName').value = category.name;
+        document.getElementById('categoryWage').value = category.wage;
+      } else {
+        document.getElementById('categoryModalTitle').innerText = 'Add Category';
+      }
+    }
+    // Category form submission
+    document.getElementById('categoryForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      pushHistory();
+      let id = document.getElementById('categoryId').value;
+      let name = document.getElementById('categoryName').value;
+      let wage = parseFloat(document.getElementById('categoryWage').value);
+      if(id) {
+        // Edit existing category
+        let cat = categories.find(c => c.id === id);
+        if(cat) {
+          cat.name = name;
+          cat.wage = wage;
+          // Update wage for workers of this category
+          workers.forEach(worker => {
+            if(worker.categoryId === id) worker.wage = wage;
+          });
+        }
+      } else {
+        // Add new category
+        let newCat = {
+          id: 'c' + new Date().getTime(),
+          name: name,
+          wage: wage
+        };
+        categories.push(newCat);
+      }
+      saveData();
+      categoryModal.style.display = 'none';
+      populateCategoryOptions();
+      renderCategoryList();
+      renderTable();
+    });
+
+    /***********************
+     * PDF Export using jsPDF
+     ***********************/
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+      const { jsPDF } = window.jspdf;
+      let doc = new jsPDF('landscape');
+      doc.setFontSize(16);
+      doc.text("Attendance Report", 14, 15);
+      doc.setFontSize(10);
+      // Capture header row
+      let headers = [];
+      document.querySelectorAll("#attendanceTable thead tr th").forEach(th => {
+        headers.push(th.innerText);
+      });
+      let rows = [headers];
+      // Capture each table row
+      document.querySelectorAll("#attendanceTable tbody tr").forEach(tr => {
+        let row = [];
+        tr.querySelectorAll("td").forEach(td => {
+          row.push(td.innerText);
+        });
+        rows.push(row);
+      });
+      // Simple layout: add rows line by line
+      let startY = 25;
+      rows.forEach((row, index) => {
+        doc.text(row.join(" | "), 14, startY + (index * 7));
+      });
+      doc.save("attendance_report.pdf");
+    });
+
+    /***********************
+     * Initialization Call
+     ***********************/
+    loadData();
+    updateWeekHeaders();
+    populateCategoryOptions();
+    renderCategoryList();
+    renderTable();
+    updateClock();
+
+    // Close modals when clicking outside content
+    window.onclick = function(event) {
+      if (event.target == workerModal) {
+        workerModal.style.display = "none";
+      }
+      if (event.target == categoryModal) {
+        categoryModal.style.display = "none";
+      }
+    };
+  </script>
+</body>
+</html>
