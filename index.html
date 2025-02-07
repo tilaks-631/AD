@@ -430,8 +430,12 @@
           const weekKey = getWeekKey();
           if(!worker.attendance) worker.attendance = {};
           if(!worker.attendance[weekKey]) worker.attendance[weekKey] = ['', '', '', '', '', ''];
-          // Instead of capturing stale "state", fetch current state on tap:
-          td.addEventListener('click', function() {
+          // Set initial style based on current state
+          let state = worker.attendance[weekKey][i];
+          setCellStyle(td, state);
+          // Define handler to cycle attendance state
+          const attendanceHandler = function(e) {
+            e.preventDefault();
             pushHistory();
             const currentState = worker.attendance[weekKey][i];
             let newState;
@@ -443,10 +447,10 @@
             setCellStyle(td, newState);
             renderTable();
             saveData();
-          });
-          // Set initial style based on state
-          let state = worker.attendance[weekKey][i];
-          setCellStyle(td, state);
+          };
+          // Add both click and touchstart events for better responsiveness
+          td.addEventListener('click', attendanceHandler);
+          td.addEventListener('touchstart', attendanceHandler);
           tr.appendChild(td);
           // Payment calculation: P = full wage, H = half wage, A = 0
           let wage = parseFloat(worker.wage) || 0;
@@ -501,7 +505,6 @@
               workers = workers.filter(w => w.id !== item.id);
             } else if(type === 'category') {
               categories = categories.filter(c => c.id !== item.id);
-              // Remove category reference from workers if category deleted
               workers.forEach(worker => {
                 if(worker.categoryId === item.id) worker.categoryId = '';
               });
